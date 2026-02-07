@@ -89,8 +89,8 @@ def main():
     while True:
         # Send the current conversation to the model
         chat = client.chat.completions.create(
-            # model="z-ai/glm-4.5-air:free",
-            model="anthropic/claude-haiku-4.5",
+            model="z-ai/glm-4.5-air:free",
+            # model="anthropic/claude-haiku-4.5",
             messages=messages,
             tools=tools
         )
