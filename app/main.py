@@ -29,7 +29,7 @@ def main():
     tools = [{
         "type": "function",
         "function": {
-            "name": "Read",
+            "name": "read_file",
             "description": "Read and return the contents of a file",
             "parameters": {
                 "type": "object",
@@ -42,7 +42,30 @@ def main():
                 "required": ["file_path"]
             }
         }
-    }]
+    },
+    {
+  "type": "function",
+  "function": {
+    "name": "write_file",
+    "description": "Write content to a file",
+    "parameters": {
+      "type": "object",
+      "required": ["file_path", "content"],
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "The path of the file to write to"
+        },
+        "content": {
+          "type": "string",
+          "description": "The content to write to the file"
+        }
+      }
+    }
+  }
+}
+
+    ]
     
     # Agent loop: continue until the model responds without tool calls
     while True:
@@ -74,7 +97,7 @@ def main():
                 arguments = json.loads(tool_call.function.arguments)
                 
                 # Execute the Read tool
-                if function_name == "Read":
+                if function_name == "read_file":
                     file_path = arguments["file_path"]
                     
                     try:
@@ -84,6 +107,24 @@ def main():
                         tool_result = file_contents
                     except Exception as e:
                         tool_result = f"Error reading file: {str(e)}"
+                    
+                    # Add the tool result to the conversation
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result
+                    })
+                elif function_name == "write_file":
+                    file_path = arguments["file_path"]
+                    content = arguments["content"]
+                    
+                    try:
+                        # Write the file
+                        with open(file_path, 'w') as f:
+                            f.write(content)
+                        tool_result = "File written successfully"
+                    except Exception as e:
+                        tool_result = f"Error writing file: {str(e)}"
                     
                     # Add the tool result to the conversation
                     messages.append({
