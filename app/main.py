@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import sys
 
@@ -18,61 +19,82 @@ def main():
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-    chat = client.chat.completions.create(
-        model="anthropic/claude-haiku-4.5",
-        messages=[{"role": "user", "content": args.p}],
-	tools=[{
-  "type": "function",
-  "function": {
-    "name": "Read",
-    "description": "Read and return the contents of a file",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "file_path": {
-          "type": "string",
-          "description": "The path to the file to read"
-        }
-      },
-      "required": ["file_path"]
-    }
-  }
-}]
-    )
-
-    if not chat.choices or len(chat.choices) == 0:
-        raise RuntimeError("no choices in response")
-
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!", file=sys.stderr)
 
-    message = chat.choices[0].message
+    # Initialize the conversation with the user's prompt
+    messages = [{"role": "user", "content": args.p}]
     
-    # Check if the response contains tool_calls
-    if message.tool_calls and len(message.tool_calls) > 0:
-        # Extract the first tool call
-        tool_call = message.tool_calls[0]
+    # Define the tools array (can be reused across iterations)
+    tools = [{
+        "type": "function",
+        "function": {
+            "name": "Read",
+            "description": "Read and return the contents of a file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The path to the file to read"
+                    }
+                },
+                "required": ["file_path"]
+            }
+        }
+    }]
+    
+    # Agent loop: continue until the model responds without tool calls
+    while True:
+        # Send the current conversation to the model
+        chat = client.chat.completions.create(
+            # model="z-ai/glm-4.5-air:free",
+            model="anthropic/claude-haiku-4.5",
+            messages=messages,
+            tools=tools
+        )
         
-        # Parse the function name
-        function_name = tool_call.function.name
+        if not chat.choices or len(chat.choices) == 0:
+            raise RuntimeError("no choices in response")
         
-        # Parse the arguments (they come as a JSON string)
-        import json
-        arguments = json.loads(tool_call.function.arguments)
+        message = chat.choices[0].message
         
-        # Execute the Read tool
-        if function_name == "Read":
-            file_path = arguments["file_path"]
-            
-            # Read the file and output its contents
-            with open(file_path, 'r') as f:
-                file_contents = f.read()
-            
-            # Output the result to stdout
-            print(file_contents)
-    else:
-        # If no tool calls, just print the message content
-        print(message.content)
+        # Add the assistant's response to the conversation
+        messages.append({
+            "role": "assistant",
+            "content": message.content,
+            "tool_calls": message.tool_calls if message.tool_calls else None
+        })
+        
+        # Check if the response contains tool calls
+        if message.tool_calls and len(message.tool_calls) > 0:
+            # Execute each requested tool
+            for tool_call in message.tool_calls:
+                function_name = tool_call.function.name
+                arguments = json.loads(tool_call.function.arguments)
+                
+                # Execute the Read tool
+                if function_name == "Read":
+                    file_path = arguments["file_path"]
+                    
+                    try:
+                        # Read the file
+                        with open(file_path, 'r') as f:
+                            file_contents = f.read()
+                        tool_result = file_contents
+                    except Exception as e:
+                        tool_result = f"Error reading file: {str(e)}"
+                    
+                    # Add the tool result to the conversation
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result
+                    })
+        else:
+            # No tool calls - we have the final response
+            print(message.content)
+            break
 
 
 if __name__ == "__main__":
