@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+import subprocess
 
 from openai import OpenAI
 
@@ -59,6 +60,23 @@ def main():
         "content": {
           "type": "string",
           "description": "The content to write to the file"
+        }
+      }
+    }
+  }
+},
+{
+  "type": "function",
+  "function": {
+    "name": "Bash",
+    "description": "Execute a shell command",
+    "parameters": {
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The command to execute"
         }
       }
     }
@@ -125,6 +143,22 @@ def main():
                         tool_result = "File written successfully"
                     except Exception as e:
                         tool_result = f"Error writing file: {str(e)}"
+                    
+                    # Add the tool result to the conversation
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result
+                    })
+                elif function_name == "Bash":
+                    command = arguments["command"]
+                    
+                    try:
+                        # Execute the command
+                        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                        tool_result = f"Command executed successfully:\n{result.stdout}"
+                    except Exception as e:
+                        tool_result = f"Error executing command: {str(e)}"
                     
                     # Add the tool result to the conversation
                     messages.append({
