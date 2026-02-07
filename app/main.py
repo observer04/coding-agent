@@ -19,7 +19,8 @@ def main():
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
     chat = client.chat.completions.create(
-        model="anthropic/claude-haiku-4.5",
+ #       model="anthropic/claude-haiku-4.5",
+	model="z-ai/glm-4.5-air:free",
         messages=[{"role": "user", "content": args.p}],
 	tools=[{
   "type": "function",
@@ -46,8 +47,33 @@ def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!", file=sys.stderr)
 
-    # TODO: Uncomment the following line to pass the first stage
-    print(chat.choices[0].message.content)
+    message = chat.choices[0].message
+    
+    # Check if the response contains tool_calls
+    if message.tool_calls and len(message.tool_calls) > 0:
+        # Extract the first tool call
+        tool_call = message.tool_calls[0]
+        
+        # Parse the function name
+        function_name = tool_call.function.name
+        
+        # Parse the arguments (they come as a JSON string)
+        import json
+        arguments = json.loads(tool_call.function.arguments)
+        
+        # Execute the Read tool
+        if function_name == "Read":
+            file_path = arguments["file_path"]
+            
+            # Read the file and output its contents
+            with open(file_path, 'r') as f:
+                file_contents = f.read()
+            
+            # Output the result to stdout
+            print(file_contents)
+    else:
+        # If no tool calls, just print the message content
+        print(message.content)
 
 
 if __name__ == "__main__":
